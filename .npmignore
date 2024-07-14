@@ -1,0 +1,17 @@
+.github
+.vs
+.vscode
+node_modules
+spec
+src
+tsconfig
+.editorconfig
+.eslintignore
+.eslintrc
+.gitattributes
+.gitignore
+CODE_OF_CONDUCT.md
+jasmine.json
+package-lock.json
+tsconfig.json
+webpack.config.js
