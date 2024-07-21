@@ -1,6 +1,6 @@
-import { Frequency } from './frequency';
-import { PitchDetector } from './pitch-detector';
-import { SampleRate } from './sample-rate';
+import { Frequency } from '../frequency';
+import { PitchDetector } from '../pitch-detector';
+import { SampleRate } from '../sample-rate';
 
 /**
  * Implementation of YIN pitch detection algorithm.
@@ -103,31 +103,6 @@ export class Yin implements PitchDetector
         return -1;
     }
 
-    /**
-     * Refines the tau estimate using parabolic interpolation for more accurate pitch estimation.
-     * 
-     * @param {Float32Array} samples Samples.
-     * @param {number} tau Tau.
-     *  
-     * @returns {number} Better tau.
-     */
-    private applyParabolicInterpolation(samples: Float32Array, tau: number): number
-    {
-        const prevTau = tau - 1;
-        const nextTau = tau + 1;
-
-        if (0 <= prevTau && nextTau < samples.length)
-        {
-            const s = samples[tau - 1];
-            const t = samples[tau];
-            const u = samples[tau + 1];
-    
-            return tau + (s - u) / (2 * (2 * t - s - u));
-        }
-       
-        return tau;
-    }
-    
     /**
      * Detects fundamental frequency based on provided samples and sample rate.
      * 
