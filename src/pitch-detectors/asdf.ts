@@ -1,5 +1,5 @@
 import { Frequency } from '../frequency';
-import { isNil } from '../functions';
+import { isNil } from '../functions/is-nil';
 import { PitchDetector } from '../pitch-detector';
 import { SampleRate } from '../sample-rate';
 import { Tau } from '../tau';
@@ -115,7 +115,7 @@ export class Asdf extends PitchDetector
     public override detect(samples: Float32Array, sampleRate: SampleRate): Frequency 
     {
         const minTau = Math.floor(sampleRate / this.maxFrequency);
-        const maxTau = Math.floor(sampleRate / this.minFrequency);
+        const maxTau = Math.ceil(sampleRate / this.minFrequency);
         const threshold = this.threshold;
         const bestTau = this.findBestTau(samples, minTau, maxTau, threshold);
         const frequency = bestTau > 0 ? sampleRate / bestTau : 0;
@@ -131,7 +131,7 @@ export class Asdf extends PitchDetector
      * @param {Tau} maxTau Max delay between two sample points.
      * @param {number} threshold The first significant minimum that corresponds to the fundamental frequency.
      * 
-     * @returns {Tau} Best tau within provided delay range.
+     * @returns {Tau} Best tau within provided samples.
      */
     private findBestTau(samples: Float32Array, minTau: Tau, maxTau: Tau, threshold: number): Tau 
     {
@@ -143,7 +143,7 @@ export class Asdf extends PitchDetector
 
             if (asdf < threshold) 
             {
-                bestTau = this.guessBestTau(samples, i, maxTau, asdf);
+                bestTau = this.findAbsoluteThreshold(samples, i, maxTau, asdf);
                 bestTau = this.applyParabolicInterpolation(samples, bestTau);
 
                 break;
@@ -154,16 +154,16 @@ export class Asdf extends PitchDetector
     }
 
     /**
-     * Guesses best tau.
+     * Finds the absolute threshold and returns tau which corresponds to it.
      * 
      * @param {Float32Array} samples Samples used for pitch detection.
      * @param {Tau} minTau Min delay between two sample points.
      * @param {Tau} maxTau Max delay between two sample points.
      * @param {number} value Value which reached configured threshold.
      * 
-     * @returns {Tau} Best tau within provided delay range.
+     * @returns {Tau} Tau which corresponds to the absolute threshold.
      */
-    private guessBestTau(samples: Float32Array, minTau: Tau, maxTau: Tau, value: number): Tau 
+    private findAbsoluteThreshold(samples: Float32Array, minTau: Tau, maxTau: Tau, value: number): Tau
     {
         let bestTau = minTau + 1;
 
@@ -198,7 +198,7 @@ export class Asdf extends PitchDetector
     {
         let sum = 0;
 
-        for (let i = 0; i < samples.length - tau; i++) 
+        for (let i = 1; i < samples.length - tau; i++) 
         {
             sum += Math.pow(samples[i] - samples[i + tau], 2);
         }

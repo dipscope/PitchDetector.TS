@@ -1,47 +1,180 @@
 import { Frequency } from '../frequency';
+import { isNil } from '../functions/is-nil';
 import { PitchDetector } from '../pitch-detector';
 import { SampleRate } from '../sample-rate';
+import { Tau } from '../tau';
+import { YinOptions } from './yin-options';
 
 /**
- * Implementation of YIN pitch detection algorithm.
+ * Implementation of YIN pitch detection algorithm which detects pitch by calculating the 
+ * cumulative mean normalized difference between the signal and a delayed version of itself.
  * 
  * @type {Yin}
  */
-export class Yin implements PitchDetector
+export class Yin extends PitchDetector
 {
     /**
-     * The first significant minimum that corresponds to the fundamental frequency. The threshold 
-     * is typically a value between 0 and 1. 
+     * YIN options.
      * 
-     * @type {number}
+     * @type {YinOptions}
      */
-    private readonly threshold: number;
-    
+    private readonly yinOptions: YinOptions;
+
     /**
      * Constructor.
      * 
-     * @param {number} threshold Threshold.
+     * @param {YinOptions} yinOptions YIN options.
      */
-    public constructor(threshold: number = 0.1)
+    public constructor(yinOptions: Partial<YinOptions> = {})
     {
-        this.threshold = threshold;
+        super();
+
+        this.yinOptions = this.constructYinOptions();
+
+        this.configure(yinOptions);
 
         return;
     }
-    
+
     /**
-     * Computes the difference for a given lag tau.
+     * The first significant minimum that corresponds to the fundamental frequency. The threshold 
+     * is typically a value between 0 and 1.
      * 
-     * @param {Float32Array} samples Samples.
-     * @param {number} tau Tau.
+     * @returns {number} The first significant minimum.
+     */
+    public get threshold(): number 
+    {
+        return this.yinOptions.threshold;
+    }
+
+    /**
+     * Constructs default YIN options.
+     * 
+     * @returns {YinOptions} Default YIN options.
+     */
+    private constructYinOptions(): YinOptions 
+    {
+        return { threshold: 0.1 };
+    }
+
+    /**
+     * Configures YIN pitch detector.
+     * 
+     * @param {Partial<YinOptions>} yinOptions YIN options.
+     * 
+     * @returns {this} YIN pitch detector.
+     */
+    public override configure(yinOptions: Partial<YinOptions>): this 
+    {
+        if (!isNil(yinOptions.threshold))
+        {
+            this.yinOptions.threshold = yinOptions.threshold;
+        }
+
+        return this;
+    }
+
+    /**
+     * Detects fundamental frequency based on provided samples and sample rate.
+     * 
+     * @param {Float32Array} samples Samples used for pitch detection.
+     * @param {SampleRate} sampleRate Sample rate of provided samples.
+     * 
+     * @returns {Frequency} Fundamental frequency or 0 if no valid pitch is detected.
+     */
+    public override detect(samples: Float32Array, sampleRate: SampleRate): Frequency 
+    {
+        const threshold = this.threshold;
+        const bestTau = this.findBestTau(samples, threshold);
+        const frequency = bestTau > 0 ? sampleRate / bestTau : 0;
+
+        return frequency;
+    }
+
+    /**
+     * Finds the best tau using cumulative mean normalized difference function.
+     * 
+     * @param {Float32Array} samples Samples used for pitch detection.
+     * @param {number} threshold The first significant minimum that corresponds to the fundamental frequency.
+     * 
+     * @returns {Tau} Best tau within provided samples.
+     */
+    private findBestTau(samples: Float32Array, threshold: number): Tau
+    {
+        let bestTau = 0;
+        let sum = 0;
+        let cmnd = 1;
+        
+        for (let i = 1; i < samples.length; i++)
+        {
+            const diff = this.computeDiff(samples, i);
+
+            sum += diff;
+            cmnd = diff * i / sum;
+
+            if (cmnd < threshold)
+            {
+                bestTau = this.findAbsoluteThreshold(samples, i, samples.length, sum, cmnd);
+                bestTau = this.applyParabolicInterpolation(samples, bestTau);
+
+                break;
+            }
+        }
+
+        return bestTau;
+    }
+
+    /**
+     * Finds the absolute threshold and returns tau which corresponds to it.
+     * 
+     * @param {Float32Array} samples Samples used for pitch detection.
+     * @param {Tau} minTau Min delay between two sample points.
+     * @param {Tau} maxTau Max delay between two sample points.
+     * @param {number} sum Sum which reached configured threshold.
+     * @param {number} value Value which reached configured threshold.
+     * 
+     * @returns {Tau} Tau which corresponds to the absolute threshold.
+     */
+    private findAbsoluteThreshold(samples: Float32Array, minTau: Tau, maxTau: Tau, sum: number, value: number): Tau
+    {
+        let bestTau = minTau + 1;
+        let cmnd = 1;
+
+        while (bestTau < maxTau)
+        {
+            const diff = this.computeDiff(samples, bestTau);
+
+            sum += diff;
+            cmnd = diff * bestTau / sum;
+
+            if (cmnd < value)
+            {
+                value = cmnd;
+
+                bestTau++;
+
+                continue;
+            }
+
+            break;
+        }
+
+        return bestTau - 1;
+    }
+
+    /**
+     * Computes the difference between the signal and a delayed version of itself.
+     * 
+     * @param {Float32Array} samples Samples used for pitch detection.
+     * @param {Tau} tau Delay between two sample points.
      * 
      * @returns {number} Difference.
      */
-    private computeDifference(samples: Float32Array, tau: number): number 
+    private computeDiff(samples: Float32Array, tau: Tau): number 
     {
         let sum = 0;
 
-        for (let i = 0; i < samples.length - tau; i++)
+        for (let i = 1; i < samples.length - tau; i++)
         {
             const diff = samples[i] - samples[i + tau];
 
@@ -49,74 +182,5 @@ export class Yin implements PitchDetector
         }
 
         return sum;
-    }
-
-    /**
-     * Computes the CMND (cumulative mean normalized difference) for provided samples.
-     * 
-     * @param {Float32Array} samples Samples.
-     * 
-     * @returns {Float32Array} Cumulative mean normalized difference result.
-     */
-    private computeCmnd(samples: Float32Array): Float32Array
-    {
-        const cmnd = new Float32Array(samples.length);
-
-        cmnd[0] = 1;
-        
-        let sum = 0;
-
-        for (let i = 1; i < samples.length; i++)
-        {
-            sum += this.computeDifference(samples, i);
-
-            cmnd[i] = sum / i;
-        }
-
-        return cmnd;
-    }
-
-    /**
-     * Finds the first minimum value below the threshold in the CMND.
-     * 
-     * @param {Float32Array} cmnd Cumulative mean normalized difference.
-     * 
-     * @returns {number} Absolute threshold.
-     */
-    private findAbsoluteThreshold(cmnd: Float32Array): number 
-    {
-        const threshold = this.threshold;
-
-        for (let i = 1; i < cmnd.length; i++)
-        {
-            if (cmnd[i] < threshold)
-            {
-                while (i + 1 < cmnd.length && cmnd[i + 1] < cmnd[i])
-                {
-                    i++;
-                }
-
-                return i;
-            }
-        }
-
-        return -1;
-    }
-
-    /**
-     * Detects fundamental frequency based on provided samples and sample rate.
-     * 
-     * @param {Float32Array} samples Samples.
-     * @param {SampleRate} sampleRate Sample rate.
-     * 
-     * @returns {Frequency} Fundamental frequency.
-     */
-    public detect(samples: Float32Array, sampleRate: SampleRate): Frequency
-    {
-        const cmnd = this.computeCmnd(samples);
-        const tau = this.findAbsoluteThreshold(cmnd);
-        const frequency = tau === -1 ? -1 : sampleRate / this.applyParabolicInterpolation(cmnd, tau);
-
-        return frequency;
     }
 }
