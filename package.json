@@ -1,6 +1,6 @@
 {
   "author": "DipScope authors and contributors",
-  "description": "Pitch detection algorithms.",
+  "description": "Collection of pitch detection algorithms for TypeScript and JavaScript.",
   "devDependencies": {
     "@types/jasmine": "^3.6.3",
     "@typescript-eslint/eslint-plugin": "^4.14.2",
@@ -19,7 +19,15 @@
     "webpack-dev-server": "^4.9.3"
   },
   "keywords": [
-    "pitch detection"
+    "pitch detector",
+    "pitch detection algorithms",
+    "audio processing",
+    "music applications",
+    "real time pitch detection",
+    "audio analysis",
+    "yin pitch detection algorithm",
+    "amdf pitch detection algorithm",
+    "asdf pitch detection algorithm"
   ],
   "license": "Apache-2.0",
   "main": "./dist/umd/index.js",

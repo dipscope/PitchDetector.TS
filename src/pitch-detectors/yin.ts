@@ -11,7 +11,7 @@ import { YinOptions } from './yin-options';
  * 
  * @type {Yin}
  */
-export class Yin extends PitchDetector
+export class Yin implements PitchDetector
 {
     /**
      * YIN options.
@@ -27,13 +27,23 @@ export class Yin extends PitchDetector
      */
     public constructor(yinOptions: Partial<YinOptions> = {})
     {
-        super();
-
         this.yinOptions = this.constructYinOptions();
 
         this.configure(yinOptions);
 
         return;
+    }
+
+    /**
+     * This is the size of the segment of the audio signal that the algorithm processes at a time. 
+     * The buffer size should be large enough to capture several cycles of the lowest frequency of 
+     * interest but not so large as to be computationally inefficient.
+     * 
+     * @type {number}
+     */
+    public get bufferSize(): number 
+    {
+        return this.yinOptions.bufferSize;
     }
 
     /**
@@ -54,7 +64,7 @@ export class Yin extends PitchDetector
      */
     private constructYinOptions(): YinOptions 
     {
-        return { threshold: 0.1 };
+        return { bufferSize: 1024, threshold: 0.1 };
     }
 
     /**
@@ -64,8 +74,13 @@ export class Yin extends PitchDetector
      * 
      * @returns {this} YIN pitch detector.
      */
-    public override configure(yinOptions: Partial<YinOptions>): this 
+    public configure(yinOptions: Partial<YinOptions>): this 
     {
+        if (!isNil(yinOptions.bufferSize))
+        {
+            this.yinOptions.bufferSize = yinOptions.bufferSize;
+        }
+
         if (!isNil(yinOptions.threshold))
         {
             this.yinOptions.threshold = yinOptions.threshold;
@@ -82,12 +97,13 @@ export class Yin extends PitchDetector
      * 
      * @returns {Frequency} Fundamental frequency or 0 if no valid pitch is detected.
      */
-    public override detect(samples: Float32Array, sampleRate: SampleRate): Frequency 
+    public detect(samples: Float32Array, sampleRate: SampleRate): Frequency 
     {
+        const bufferSize = this.bufferSize;
         const threshold = this.threshold;
-        const bestTau = this.findBestTau(samples, threshold);
+        const bestTau = this.findBestTau(samples, bufferSize, threshold);
         const frequency = bestTau > 0 ? sampleRate / bestTau : 0;
-
+        
         return frequency;
     }
 
@@ -95,27 +111,27 @@ export class Yin extends PitchDetector
      * Finds the best tau using cumulative mean normalized difference function.
      * 
      * @param {Float32Array} samples Samples used for pitch detection.
+     * @param {number} bufferSize Buffer size that the algorithm processes at a time.
      * @param {number} threshold The first significant minimum that corresponds to the fundamental frequency.
      * 
      * @returns {Tau} Best tau within provided samples.
      */
-    private findBestTau(samples: Float32Array, threshold: number): Tau
+    private findBestTau(samples: Float32Array, bufferSize: number, threshold: number): Tau
     {
         let bestTau = 0;
+        let diff = 0;
         let sum = 0;
         let cmnd = 1;
-        
-        for (let i = 1; i < samples.length; i++)
-        {
-            const diff = this.computeDiff(samples, i);
 
-            sum += diff;
+        for (let i = 1; i < bufferSize; i++)
+        {
+            diff = this.computeDiff(samples, i);
+            sum = sum + diff;
             cmnd = diff * i / sum;
 
             if (cmnd < threshold)
             {
-                bestTau = this.findAbsoluteThreshold(samples, i, samples.length, sum, cmnd);
-                bestTau = this.applyParabolicInterpolation(samples, bestTau);
+                bestTau = this.findAbsoluteThreshold(samples, i, bufferSize, diff, sum, cmnd);
 
                 break;
             }
@@ -128,28 +144,32 @@ export class Yin extends PitchDetector
      * Finds the absolute threshold and returns tau which corresponds to it.
      * 
      * @param {Float32Array} samples Samples used for pitch detection.
-     * @param {Tau} minTau Min delay between two sample points.
-     * @param {Tau} maxTau Max delay between two sample points.
+     * @param {Tau} tau Tau which reached configured threshold.
+     * @param {number} bufferSize Buffer size that the algorithm processes at a time.
+     * @param {number} diff Difference which reached configured threshold.
      * @param {number} sum Sum which reached configured threshold.
-     * @param {number} value Value which reached configured threshold.
+     * @param {number} cmnd Cumulative mean normalized difference which reached configured threshold.
      * 
      * @returns {Tau} Tau which corresponds to the absolute threshold.
      */
-    private findAbsoluteThreshold(samples: Float32Array, minTau: Tau, maxTau: Tau, sum: number, value: number): Tau
+    private findAbsoluteThreshold(samples: Float32Array, tau: Tau, bufferSize: number, diff: number, sum: number, cmnd: number): Tau
     {
-        let bestTau = minTau + 1;
-        let cmnd = 1;
+        let bestTau = tau + 1;
+        let absoluteDiff = diff;
+        let absoluteSum = sum;
+        let absoluteCmnd = cmnd;
 
-        while (bestTau < maxTau)
+        while (bestTau < bufferSize)
         {
-            const diff = this.computeDiff(samples, bestTau);
-
-            sum += diff;
-            cmnd = diff * bestTau / sum;
-
-            if (cmnd < value)
+            absoluteDiff = this.computeDiff(samples, bestTau);
+            absoluteSum = absoluteSum + absoluteDiff;
+            absoluteCmnd = absoluteDiff * bestTau / absoluteSum;
+            
+            if (absoluteCmnd < cmnd)
             {
-                value = cmnd;
+                diff = absoluteDiff;
+                sum = absoluteSum;
+                cmnd = absoluteCmnd;
 
                 bestTau++;
 
@@ -159,7 +179,54 @@ export class Yin extends PitchDetector
             break;
         }
 
-        return bestTau - 1;
+        return this.applyParabolicInterpolation(samples, bestTau - 1, bufferSize, diff, sum, cmnd);
+    }
+
+    /**
+     * Refines tau using parabolic interpolation for more accurate pitch estimation.
+     * 
+     * @param {Float32Array} samples Samples used for pitch detection.
+     * @param {Tau} tau Tau which reached absolute threshold.
+     * @param {number} bufferSize Buffer size that the algorithm processes at a time.
+     * @param {number} diff Difference which reached absolute threshold.
+     * @param {number} sum Sum which reached absolute threshold.
+     * @param {number} cmnd Cumulative mean normalized difference which reached absolute threshold.
+     * 
+     * @returns {Tau} Interpolated tau.
+     */
+    private applyParabolicInterpolation(samples: Float32Array, tau: Tau, bufferSize: number, diff: number, sum: number, cmnd: number): Tau
+    {
+        const prevTau = tau - 1;
+
+        if (prevTau < 0)
+        {
+            return tau;
+        }
+
+        const nextTau = tau + 1;
+
+        if (bufferSize <= nextTau)
+        {
+            return tau;
+        }
+
+        const prevDiff = this.computeDiff(samples, prevTau);
+        const nextDiff = this.computeDiff(samples, nextTau);
+        const prevSum = sum - diff;
+        const nextSum = sum + nextDiff;
+        const prevCmnd = prevDiff * prevTau / prevSum;
+        const nextCmnd = nextDiff * nextTau / nextSum;
+        const a = 2 * cmnd - nextCmnd - prevCmnd;
+
+        if (a === 0)
+        {
+            return tau;
+        }
+
+        const b = nextCmnd - prevCmnd;
+        const interpolatedTau = tau + b / (2 * a);
+
+        return interpolatedTau;
     }
 
     /**

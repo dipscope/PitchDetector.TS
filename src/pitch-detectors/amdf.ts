@@ -12,7 +12,7 @@ import { AmdfOptions } from './amdf-options';
  * 
  * @type {Amdf}
  */
-export class Amdf extends PitchDetector
+export class Amdf implements PitchDetector
 {
     /**
      * AMDF options.
@@ -28,8 +28,6 @@ export class Amdf extends PitchDetector
      */
     public constructor(amdfOptions: Partial<AmdfOptions> = {})
     {
-        super();
-
         this.amdfOptions = this.constructAmdfOptions();
 
         this.configure(amdfOptions)
@@ -85,7 +83,7 @@ export class Amdf extends PitchDetector
      * 
      * @returns {this} AMDF pitch detector.
      */
-    public override configure(amdfOptions: Partial<AmdfOptions>): this
+    public configure(amdfOptions: Partial<AmdfOptions>): this
     {
         if (!isNil(amdfOptions.minFrequency))
         {
@@ -113,7 +111,7 @@ export class Amdf extends PitchDetector
      * 
      * @returns {Frequency} Fundamental frequency or 0 if no valid pitch is detected.
      */
-    public override detect(samples: Float32Array, sampleRate: SampleRate): Frequency
+    public detect(samples: Float32Array, sampleRate: SampleRate): Frequency
     {
         const minTau = Math.floor(sampleRate / this.maxFrequency);
         const maxTau = Math.ceil(sampleRate / this.minFrequency);
@@ -123,7 +121,7 @@ export class Amdf extends PitchDetector
 
         return frequency;
     }
-
+    
     /**
      * Finds the best tau using average magnitude difference function.
      * 
@@ -145,7 +143,6 @@ export class Amdf extends PitchDetector
             if (amdf < threshold)
             {
                 bestTau = this.findAbsoluteThreshold(samples, i, maxTau, amdf);
-                bestTau = this.applyParabolicInterpolation(samples, bestTau);
 
                 break;
             }

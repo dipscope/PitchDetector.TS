@@ -11,7 +11,7 @@ import { AsdfOptions } from './asdf-options';
  * 
  * @type {Asdf}
  */
-export class Asdf extends PitchDetector 
+export class Asdf implements PitchDetector 
 {
     /**
      * ASDF options.
@@ -27,8 +27,6 @@ export class Asdf extends PitchDetector
      */
     public constructor(asdfOptions: Partial<AsdfOptions> = {}) 
     {
-        super();
-
         this.asdfOptions = this.constructAsdfOptions();
 
         this.configure(asdfOptions)
@@ -84,7 +82,7 @@ export class Asdf extends PitchDetector
      * 
      * @returns {this} ASDF pitch detector.
      */
-    public override configure(asdfOptions: Partial<AsdfOptions>): this 
+    public configure(asdfOptions: Partial<AsdfOptions>): this 
     {
         if (!isNil(asdfOptions.minFrequency)) 
         {
@@ -103,7 +101,7 @@ export class Asdf extends PitchDetector
 
         return this;
     }
-
+    
     /**
      * Detects fundamental frequency based on provided samples and sample rate.
      * 
@@ -112,7 +110,7 @@ export class Asdf extends PitchDetector
      * 
      * @returns {Frequency} Fundamental frequency or 0 if no valid pitch is detected.
      */
-    public override detect(samples: Float32Array, sampleRate: SampleRate): Frequency 
+    public detect(samples: Float32Array, sampleRate: SampleRate): Frequency 
     {
         const minTau = Math.floor(sampleRate / this.maxFrequency);
         const maxTau = Math.ceil(sampleRate / this.minFrequency);
@@ -144,7 +142,6 @@ export class Asdf extends PitchDetector
             if (asdf < threshold) 
             {
                 bestTau = this.findAbsoluteThreshold(samples, i, maxTau, asdf);
-                bestTau = this.applyParabolicInterpolation(samples, bestTau);
 
                 break;
             }

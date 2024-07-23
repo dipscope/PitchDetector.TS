@@ -1,72 +1,95 @@
-import { Amdf } from '../src/pitch-detectors/amdf';
-import { Asdf } from '../src/pitch-detectors/asdf';
-import { McLeod } from '../src/pitch-detectors/mcleod';
-import { Yin } from '../src/pitch-detectors/yin';
+import { Amdf, Asdf, Frequency, PitchDetector, SampleRate, Yin } from '../src';
 
-const sampleRate = 44100;
-const frequency = 432;
-const bufferSize = 1024;
-const duration = 1;
-const sampleFrequency = sampleRate / frequency;
-const waveSamples = new Float32Array(sampleRate * duration);
-const noiseSamples = new Float32Array(sampleRate * duration);
-
-for (let i = 0; i < waveSamples.length; i++)
+function constructPitchDetectors(): Array<PitchDetector>
 {
-    waveSamples[i] = Math.sin(i / (sampleFrequency / (Math.PI * 2)));
+    const pitchDetectors = new Array<PitchDetector>();
+    
+    pitchDetectors.push(new Amdf());
+    pitchDetectors.push(new Asdf());
+    pitchDetectors.push(new Yin());
+
+    return pitchDetectors;
 }
 
-for (let i = 0; i < noiseSamples.length; i++)
+function constructFrequencies(): Array<Frequency>
 {
-    noiseSamples[i] = Math.random() * 2 - 1;
+    const frequencies = new Array<Frequency>();
+
+    frequencies.push(100);
+    frequencies.push(180);
+    frequencies.push(242);
+    frequencies.push(432);
+    frequencies.push(440);
+    frequencies.push(510);
+    frequencies.push(600);
+    frequencies.push(686);
+
+    return frequencies;
 }
 
-function checkFrequency(detectedFrequency: number, expectedFrequency: number): void
+function generateWaveSamples(frequency: Frequency, sampleRate: SampleRate): Float32Array
 {
-    const range = 5;
+    const duration = 1;
+    const sampleFrequency = sampleRate / frequency;
+    const waveSamples = new Float32Array(sampleRate * duration);
+    
+    for (let i = 0; i < waveSamples.length; i++)
+    {
+        waveSamples[i] = Math.sin(i / (sampleFrequency / (Math.PI * 2)));
+    }
 
+    return waveSamples;
+}
+
+function generateNoiseSamples(sampleRate: SampleRate): Float32Array
+{
+    const duration = 1;
+    const noiseSamples = new Float32Array(sampleRate * duration);
+    
+    for (let i = 0; i < noiseSamples.length; i++)
+    {
+        noiseSamples[i] = Math.random() * 2 - 1;
+    }
+
+    return noiseSamples;
+}
+
+function checkFrequency(detectedFrequency: number, expectedFrequency: number, range: number): void
+{
     expect(expectedFrequency - range <= detectedFrequency && detectedFrequency <= expectedFrequency + range).toBeTrue();
 }
 
 describe('Pitch Detector', () => 
 {
-    it('AMDF should detect pitch correctly', () => 
+    it('Pitch detectors should detect pitch correctly', () => 
     {
-        const amdf = new Amdf();
-        const detectedFrequency = amdf.detect(waveSamples, sampleRate);
+        const sampleRate = 44100;
+        const pitchDetectors = constructPitchDetectors();
+        const frequencies = constructFrequencies();
 
-        checkFrequency(detectedFrequency, frequency);
+        for (const pitchDetector of pitchDetectors)
+        {
+            for (const frequency of frequencies)
+            {
+                const waveSamples = generateWaveSamples(frequency, sampleRate);
+                const detectedFrequency = pitchDetector.detect(waveSamples, sampleRate);
+
+                checkFrequency(detectedFrequency, frequency, 5);
+            }
+        }
     });
 
-    // it('AMDF return 0 if no valid pitch is detected', () => 
-    // {
-    //     const amdf = new Amdf();
-    //     const detectedFrequency = amdf.detect(noiseSamples, sampleRate);
+    it('Pitch detectors should detect noise correctly', () => 
+    {
+        const sampleRate = 44100;
+        const pitchDetectors = constructPitchDetectors();
 
-    //     expect(detectedFrequency).toBe(0);
-    // });
+        for (const pitchDetector of pitchDetectors)
+        {
+            const noiseSamples = generateNoiseSamples(sampleRate);
+            const detectedFrequency = pitchDetector.detect(noiseSamples, sampleRate);
 
-    // it('ASDF should detect pitch correctly', () =>
-    // {
-    //     const asdf = new Asdf();
-    //     const detectedFrequency = asdf.detect(waveSamples, sampleRate);
-        
-    //     expect(detectedFrequency).toBeCloseTo(frequency, 0.1);
-    // });
-
-    // it('McLEOD should detect pitch correctly', () =>
-    // {
-    //     const mcLeod = new McLeod(bufferSize);
-    //     const detectedFrequency = mcLeod.detect(waveSamples, sampleRate);
-        
-    //     expect(detectedFrequency).toBeCloseTo(frequency, 0.1);
-    // });
-
-    // it('YIN should detect pitch correctly', () =>
-    // {
-    //     const yin = new Yin();
-    //     const detectedFrequency = yin.detect(waveSamples, sampleRate);
-        
-    //     expect(detectedFrequency).toBeCloseTo(frequency, 0.1);
-    // });
+            checkFrequency(detectedFrequency, 0, 0);
+        }
+    });
 });
