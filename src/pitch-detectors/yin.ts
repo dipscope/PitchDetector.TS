@@ -99,7 +99,7 @@ export class Yin implements PitchDetector
      */
     public detect(samples: Float32Array, sampleRate: SampleRate): Frequency 
     {
-        const bufferSize = this.bufferSize;
+        const bufferSize = Math.min(this.bufferSize, samples.length);
         const threshold = this.threshold;
         const bestTau = this.findBestTau(samples, bufferSize, threshold);
         const frequency = bestTau > 0 ? sampleRate / bestTau : 0;

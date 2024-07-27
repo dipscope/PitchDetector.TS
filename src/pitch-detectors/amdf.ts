@@ -136,6 +136,11 @@ export class Amdf implements PitchDetector
     {
         let bestTau = 0;
         
+        if (samples.length <= maxTau)
+        {
+            return bestTau;
+        }
+        
         for (let i = minTau; i < maxTau; i++)
         {
             const amdf = this.computeAmdf(samples, i);

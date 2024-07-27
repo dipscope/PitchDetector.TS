@@ -59,9 +59,9 @@ function checkFrequency(detectedFrequency: number, expectedFrequency: number, ra
     expect(expectedFrequency - range <= detectedFrequency && detectedFrequency <= expectedFrequency + range).toBeTrue();
 }
 
-describe('Pitch Detector', () => 
+describe('Pitch detector', () => 
 {
-    it('Pitch detectors should detect pitch correctly', () => 
+    it('should detect pitch correctly', () => 
     {
         const sampleRate = 44100;
         const pitchDetectors = constructPitchDetectors();
@@ -79,7 +79,7 @@ describe('Pitch Detector', () =>
         }
     });
 
-    it('Pitch detectors should detect noise correctly', () => 
+    it('should detect noise correctly', () => 
     {
         const sampleRate = 44100;
         const pitchDetectors = constructPitchDetectors();

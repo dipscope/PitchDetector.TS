@@ -135,6 +135,11 @@ export class Asdf implements PitchDetector
     {
         let bestTau = 0;
 
+        if (samples.length <= maxTau)
+        {
+            return bestTau;
+        }
+        
         for (let i = minTau; i < maxTau; i++) 
         {
             const asdf = this.computeAsdf(samples, i);
