@@ -11,4 +11,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - AMDF pitch detector.
 - ASDF pitch detector.
-- Yin pitch detector.
+- YIN pitch detector.
